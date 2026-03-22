@@ -3,57 +3,55 @@
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Order, OrderStatus, Currency } from './types';
-
-const STORAGE_KEY = 'masif_siparis_orders';
+import { supabase } from './supabase';
 
 export function useOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Verileri Supabase'den yükle
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // invoiced alanı olmayan eski kayıtlar için default false
-        setOrders(parsed.map((o: Partial<Order> & { id: string; createdAt: string; updatedAt: string }) => ({
-          invoiced: false,
-          cargoDelivered: false,
-          satisfactionSent: false,
-          currency: 'TRY' as Currency,
-          ...o,
-        } as Order)));
+    async function load() {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setOrders(data.map(rowToOrder));
       }
-    } catch {
-      // ignore
+      setLoaded(true);
     }
-    setLoaded(true);
+    load();
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-    } catch {
-      // ignore (iOS private mode, quota exceeded, vb.)
-    }
-  }, [orders, loaded]);
-
-  const addOrder = useCallback((data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addOrder = useCallback(async (input: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = new Date().toISOString();
-    const order: Order = { ...data, id: uuidv4(), createdAt: now, updatedAt: now };
-    setOrders((prev) => [order, ...prev]);
+    const id = uuidv4();
+    const order: Order = { ...input, id, createdAt: now, updatedAt: now };
+
+    const { error } = await supabase.from('orders').insert(orderToRow(order));
+    if (!error) setOrders((prev) => [order, ...prev]);
     return order;
   }, []);
 
-  const updateOrder = useCallback((id: string, data: Partial<Omit<Order, 'id' | 'createdAt'>>) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, ...data, updatedAt: new Date().toISOString() } : o))
-    );
+  const updateOrder = useCallback(async (id: string, data: Partial<Omit<Order, 'id' | 'createdAt'>>) => {
+    const updatedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from('orders')
+      .update({ ...partialToRow(data), updated_at: updatedAt })
+      .eq('id', id);
+
+    if (!error) {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, ...data, updatedAt } : o))
+      );
+    }
   }, []);
 
-  const deleteOrder = useCallback((id: string) => {
-    setOrders((prev) => prev.filter((o) => o.id !== id));
+  const deleteOrder = useCallback(async (id: string) => {
+    const { error } = await supabase.from('orders').delete().eq('id', id);
+    if (!error) setOrders((prev) => prev.filter((o) => o.id !== id));
   }, []);
 
   const updateStatus = useCallback((id: string, status: OrderStatus) => {
@@ -73,18 +71,9 @@ export function useOrders() {
   const exportCSV = useCallback(() => {
     const headers = ['Sipariş Başlığı', 'Müşteri', 'Kaynak', 'Durum', 'Kazanç', 'Para Birimi', 'Son Teslim Tarihi', 'Fatura', 'Kargo', 'Memnuniyet', 'Notlar', 'Oluşturulma'];
     const rows = orders.map((o) => [
-      o.orderTitle,
-      o.customerName,
-      o.source,
-      o.status,
-      o.income,
-      o.currency,
-      o.deadline,
-      o.invoiced ? 'Evet' : 'Hayır',
-      o.cargoDelivered ? 'Evet' : 'Hayır',
-      o.satisfactionSent ? 'Evet' : 'Hayır',
-      o.notes.replace(/,/g, ' '),
-      o.createdAt,
+      o.orderTitle, o.customerName, o.source, o.status, o.income, o.currency,
+      o.deadline, o.invoiced ? 'Evet' : 'Hayır', o.cargoDelivered ? 'Evet' : 'Hayır',
+      o.satisfactionSent ? 'Evet' : 'Hayır', o.notes.replace(/,/g, ' '), o.createdAt,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -97,4 +86,63 @@ export function useOrders() {
   }, [orders]);
 
   return { orders, loaded, addOrder, updateOrder, deleteOrder, updateStatus, exportJSON, exportCSV };
+}
+
+// ----- Dönüşüm yardımcıları -----
+
+function rowToOrder(row: Record<string, unknown>): Order {
+  return {
+    id: row.id as string,
+    customerName: (row.customer_name as string) ?? '',
+    orderTitle: (row.order_title as string) ?? '',
+    source: (row.source as string) ?? 'diğer',
+    image: (row.image as string) ?? '',
+    notes: (row.notes as string) ?? '',
+    income: (row.income as number) ?? 0,
+    currency: ((row.currency as string) ?? 'TRY') as Currency,
+    deadline: (row.deadline as string) ?? '',
+    status: (row.status as OrderStatus) ?? 'pending',
+    invoiced: (row.invoiced as boolean) ?? false,
+    cargoDelivered: (row.cargo_delivered as boolean) ?? false,
+    satisfactionSent: (row.satisfaction_sent as boolean) ?? false,
+    createdAt: (row.created_at as string) ?? '',
+    updatedAt: (row.updated_at as string) ?? '',
+  };
+}
+
+function orderToRow(o: Order) {
+  return {
+    id: o.id,
+    customer_name: o.customerName,
+    order_title: o.orderTitle,
+    source: o.source,
+    image: o.image,
+    notes: o.notes,
+    income: o.income,
+    currency: o.currency,
+    deadline: o.deadline || null,
+    status: o.status,
+    invoiced: o.invoiced,
+    cargo_delivered: o.cargoDelivered,
+    satisfaction_sent: o.satisfactionSent,
+    created_at: o.createdAt,
+    updated_at: o.updatedAt,
+  };
+}
+
+function partialToRow(data: Partial<Omit<Order, 'id' | 'createdAt'>>) {
+  const row: Record<string, unknown> = {};
+  if (data.customerName !== undefined) row.customer_name = data.customerName;
+  if (data.orderTitle !== undefined) row.order_title = data.orderTitle;
+  if (data.source !== undefined) row.source = data.source;
+  if (data.image !== undefined) row.image = data.image;
+  if (data.notes !== undefined) row.notes = data.notes;
+  if (data.income !== undefined) row.income = data.income;
+  if (data.currency !== undefined) row.currency = data.currency;
+  if (data.deadline !== undefined) row.deadline = data.deadline || null;
+  if (data.status !== undefined) row.status = data.status;
+  if (data.invoiced !== undefined) row.invoiced = data.invoiced;
+  if (data.cargoDelivered !== undefined) row.cargo_delivered = data.cargoDelivered;
+  if (data.satisfactionSent !== undefined) row.satisfaction_sent = data.satisfactionSent;
+  return row;
 }
