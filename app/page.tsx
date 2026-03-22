@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useOrders } from '@/lib/useOrders';
-import { Order, OrderStatus, STATUS_LABELS } from '@/lib/types';
+import { Order, OrderStatus } from '@/lib/types';
 import OrderCard from '@/components/OrderCard';
 import OrderForm from '@/components/OrderForm';
 import StatsPanel from '@/components/StatsPanel';
@@ -144,8 +144,34 @@ function App() {
           <StatsPanel orders={orders} />
         ) : (
           <>
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-2">
+            {/* Durum Filtreleme Butonları */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {([
+                ['all', '📋 Tümü'],
+                ['pending', '🆕 Beklemede'],
+                ['processing', '🛠️ Hazırlanıyor'],
+                ['completed', '✅ Tamamlandı'],
+                ['cancelled', '❌ İptal Edildi'],
+              ] as [OrderStatus | 'all', string][]).map(([val, label]) => {
+                const count = val === 'all' ? orders.length : orders.filter(o => o.status === val).length;
+                return (
+                  <button key={val} onClick={() => setStatusFilter(val)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                      statusFilter === val
+                        ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
+                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-amber-400'
+                    }`}>
+                    {label}
+                    <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${
+                      statusFilter === val ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                    }`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Arama & Sıralama */}
+            <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -155,25 +181,16 @@ function App() {
                   className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
-              <div className="flex gap-2">
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
-                  className="text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                  <option value="all">Tüm Durumlar</option>
-                  {(Object.entries(STATUS_LABELS) as [OrderStatus, string][]).map(([v, l]) => (
-                    <option key={v} value={v}>{l}</option>
-                  ))}
-                </select>
-                <select value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}
-                  className="text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                  <option value="createdAt">Tarihe Göre</option>
-                  <option value="deadline">Termine Göre</option>
-                  <option value="income">Kazanca Göre</option>
-                </select>
-                <button onClick={() => setSortAsc((a) => !a)}
-                  className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:text-amber-600">
-                  {sortAsc ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
-                </button>
-              </div>
+              <select value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}
+                className="text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <option value="createdAt">Tarihe Göre</option>
+                <option value="deadline">Termine Göre</option>
+                <option value="income">Kazanca Göre</option>
+              </select>
+              <button onClick={() => setSortAsc((a) => !a)}
+                className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:text-amber-600">
+                {sortAsc ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+              </button>
             </div>
 
             {/* Orders Grid */}
