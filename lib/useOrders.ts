@@ -32,7 +32,11 @@ export function useOrders() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+    } catch {
+      // ignore (iOS private mode, quota exceeded, vb.)
+    }
   }, [orders, loaded]);
 
   const addOrder = useCallback((data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {

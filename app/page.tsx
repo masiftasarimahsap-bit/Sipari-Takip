@@ -7,11 +7,12 @@ import OrderCard from '@/components/OrderCard';
 import OrderForm from '@/components/OrderForm';
 import StatsPanel from '@/components/StatsPanel';
 import { Plus, Search, Download, BarChart2, Package, Moon, Sun, SortAsc, SortDesc } from 'lucide-react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 type Tab = 'orders' | 'stats';
 type SortField = 'createdAt' | 'deadline' | 'income';
 
-export default function Home() {
+function App() {
   const { orders, loaded, addOrder, updateOrder, deleteOrder, updateStatus, exportJSON, exportCSV } = useOrders();
   const [tab, setTab] = useState<Tab>('orders');
   const [showForm, setShowForm] = useState(false);
@@ -218,5 +219,13 @@ export default function Home() {
         />
       )}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   );
 }
