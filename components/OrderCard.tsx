@@ -48,7 +48,7 @@ export default function OrderCard({ order, onEdit, onDelete, onStatusChange }: P
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow">
       {order.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={order.image} alt={order.orderTitle} className="w-full h-36 object-cover" />
+        <img src={order.image} alt={order.orderTitle} className="w-full" />
       ) : (
         <div className="w-full h-20 bg-gradient-to-br from-amber-50 to-orange-100 dark:from-gray-800 dark:to-gray-750 flex items-center justify-center">
           <ImageIcon className="w-8 h-8 text-amber-300 dark:text-gray-600" />
