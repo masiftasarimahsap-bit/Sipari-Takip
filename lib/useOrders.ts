@@ -31,7 +31,11 @@ export function useOrders() {
     const order: Order = { ...input, id, createdAt: now, updatedAt: now };
 
     const { error } = await supabase.from('orders').insert(orderToRow(order));
-    if (!error) setOrders((prev) => [order, ...prev]);
+    if (error) {
+      alert('Sipariş eklenemedi: ' + error.message);
+      return order;
+    }
+    setOrders((prev) => [order, ...prev]);
     return order;
   }, []);
 
